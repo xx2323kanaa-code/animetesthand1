@@ -1,34 +1,68 @@
-<!doctype html><html><head>
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<style>html,body,canvas{margin:0;width:100%;height:100%;background:transparent}
+<style>
+html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden}
 #cam{position:fixed;inset:0;z-index:0;object-fit:cover}
-#ui{position:fixed;left:12px;top:12px;z-index:2}</style>
-</head><body>
+#c{position:fixed;inset:0;z-index:1}
+#ui{position:fixed;left:12px;top:12px;z-index:2;display:flex;gap:8px}
+button{font-size:14px;padding:8px 10px}
+</style>
+</head>
+<body>
+
 <video id="cam" autoplay playsinline muted></video>
-<div id="ui"><button id="btn">再生</button></div>
+<div id="ui">
+  <button id="camBtn">カメラ開始</button>
+  <button id="playBtn">再生</button>
+</div>
 <canvas id="c"></canvas>
+
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
 <script>
-const v=document.getElementById('cam');
-navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})
-  .then(s=>v.srcObject=s);
+/* --- カメラ（ボタン開始） --- */
+const camBtn=document.getElementById('camBtn');
+const video=document.getElementById('cam');
+camBtn.onclick=()=>{
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})
+    .then(s=>video.srcObject=s)
+    .catch(e=>alert('カメラ失敗'));
+};
 
-const c=document.getElementById('c'),e=new BABYLON.Engine(c,true);
-const s=new BABYLON.Scene(e);
-s.clearColor=new BABYLON.Color4(0,0,0,0);
-const cam=new BABYLON.ArcRotateCamera("cam",Math.PI/2,1.1,2.2,BABYLON.Vector3.Zero(),s);
-cam.attachControl(c,true);
-new BABYLON.HemisphericLight("l",new BABYLON.Vector3(0,1,0),s);
+/* --- Babylon 基本 --- */
+const canvas=document.getElementById('c');
+const engine=new BABYLON.Engine(canvas,true,{preserveDrawingBuffer:true,stencil:true});
+const scene=new BABYLON.Scene(engine);
+scene.clearColor=new BABYLON.Color4(0,0,0,0); // 背景透明
+
+const camera=new BABYLON.ArcRotateCamera(
+  "cam", Math.PI/2, 1.1, 2.2, BABYLON.Vector3.Zero(), scene);
+camera.attachControl(canvas,true);
+new BABYLON.HemisphericLight("l", new BABYLON.Vector3(0,1,0), scene);
 
 let ag=null;
-BABYLON.SceneLoader.Append("./","animetesthand1.glb",s,()=>{
-  ag=s.animationGroups[0];
-  s.meshes.forEach(m=>m.material&&(m.material.alpha=0.6));
+
+/* --- glb 読み込み（最短チェック込み） --- */
+BABYLON.SceneLoader.Append("./","animetesthand1.glb",scene,()=>{
+  console.log('animationGroups:', scene.animationGroups);
+  ag = scene.animationGroups[0] || null;
+  // 半透明（骨のみでもOK）
+  scene.meshes.forEach(m=>m.material && (m.material.alpha=0.6));
 });
-document.getElementById('btn').onclick=()=>{
-  if(!ag)return; ag.stop(); ag.start(false,1,5,12,false);
+
+/* --- 指定フレーム再生 --- */
+document.getElementById('playBtn').onclick=()=>{
+  if(!ag){ alert('アニメ未検出'); return; }
+  ag.stop();
+  ag.start(false, 1.0, 5, 12, false); // 5〜12フレーム
 };
-e.runRenderLoop(()=>s.render());
-window.onresize=()=>e.resize();
-</script></body></html>
+
+engine.runRenderLoop(()=>scene.render());
+window.addEventListener('resize',()=>engine.resize());
+</script>
+</body>
+</html>
+
