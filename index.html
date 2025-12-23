@@ -22,7 +22,7 @@ cam.attachControl(c,true);
 new BABYLON.HemisphericLight("l",new BABYLON.Vector3(0,1,0),s);
 
 let ag=null;
-BABYLON.SceneLoader.Append("./","Hand.glb",s,()=>{
+BABYLON.SceneLoader.Append("./","animetesthand1.glb",s,()=>{
   ag=s.animationGroups[0];
   s.meshes.forEach(m=>m.material&&(m.material.alpha=0.6));
 });
