@@ -20,19 +20,21 @@ button{font-size:14px;padding:8px 10px}
 </div>
 <canvas id="c"></canvas>
 
-<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<!-- ★CSP対応：babylon.max.js に差し替え済み -->
+<script src="https://cdn.babylonjs.com/babylon.max.js"></script>
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+
 <script>
-/* --- カメラ（ボタン開始） --- */
+// カメラ（ボタン開始）
 const camBtn=document.getElementById('camBtn');
 const video=document.getElementById('cam');
 camBtn.onclick=()=>{
   navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})
     .then(s=>video.srcObject=s)
-    .catch(e=>alert('カメラ失敗'));
+    .catch(()=>alert('カメラ失敗'));
 };
 
-/* --- Babylon 基本 --- */
+// Babylon 基本
 const canvas=document.getElementById('c');
 const engine=new BABYLON.Engine(canvas,true,{preserveDrawingBuffer:true,stencil:true});
 const scene=new BABYLON.Scene(engine);
@@ -45,19 +47,18 @@ new BABYLON.HemisphericLight("l", new BABYLON.Vector3(0,1,0), scene);
 
 let ag=null;
 
-/* --- glb 読み込み（最短チェック込み） --- */
+// glb 読み込み（最短チェック込み）
 BABYLON.SceneLoader.Append("./","animetesthand1.glb",scene,()=>{
   console.log('animationGroups:', scene.animationGroups);
   ag = scene.animationGroups[0] || null;
-  // 半透明（骨のみでもOK）
-  scene.meshes.forEach(m=>m.material && (m.material.alpha=0.6));
+  scene.meshes.forEach(m=>m.material && (m.material.alpha=0.6)); // 半透明
 });
 
-/* --- 指定フレーム再生 --- */
+// 指定フレーム再生
 document.getElementById('playBtn').onclick=()=>{
   if(!ag){ alert('アニメ未検出'); return; }
   ag.stop();
-  ag.start(false, 1.0, 5, 12, false); // 5〜12フレーム
+  ag.start(false, 1.0, 5, 12, false);
 };
 
 engine.runRenderLoop(()=>scene.render());
@@ -65,4 +66,3 @@ window.addEventListener('resize',()=>engine.resize());
 </script>
 </body>
 </html>
-
