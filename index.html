@@ -48,7 +48,7 @@ new BABYLON.HemisphericLight("l", new BABYLON.Vector3(0,1,0), scene);
 let ag=null;
 
 // glb 読み込み（最短チェック込み）
-BABYLON.SceneLoader.Append("./","animetesthand1.glb",scene,()=>{
+BABYLON.SceneLoader.Append("./","animetesthand2.glb",scene,()=>{
   console.log('animationGroups:', scene.animationGroups);
   ag = scene.animationGroups[0] || null;
   scene.meshes.forEach(m=>m.material && (m.material.alpha=0.6)); // 半透明
