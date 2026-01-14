@@ -974,6 +974,8 @@ transform: translateX(-50%);
   const keyWindowNeeded = 1;
   let keyWindow = [];
   let initLogVisible = false;
+  const AUTO_FREEZE_MS = 20 * 1000;
+  let autoRelaxTimer = null;
 
   function appendInitLog(msg) {
     if (!initLogEnabled) return;
@@ -982,6 +984,20 @@ transform: translateX(-50%);
     const ts = now.toTimeString().slice(0, 8);
     initLogEl.textContent += `[${ts}] ${msg}\n`;
     initLogEl.scrollTop = initLogEl.scrollHeight;
+  }
+
+  function clearAutoRelaxTimer() {
+    if (autoRelaxTimer) {
+      clearTimeout(autoRelaxTimer);
+      autoRelaxTimer = null;
+    }
+  }
+
+  function scheduleAutoRelax(ms = AUTO_FREEZE_MS) {
+    clearAutoRelaxTimer();
+    autoRelaxTimer = setTimeout(() => {
+      performFullRelax();
+    }, ms);
   }
 
   function setInitLogVisible(on) {
@@ -1801,9 +1817,10 @@ if (restImg && saluteImg) {
             freezeGroup = dominant;
             freezeBoxes = objects.filter(o => o.group === dominant);
             if (freezeBoxes.length === 0) freezeBoxes = objects.slice();
-            freezeUntil = now + getFreezeDurationMs();
+            freezeUntil = now + AUTO_FREEZE_MS;
             statusEl.textContent = 'DO_MASTER_Grip_This? (auto freeze)';
             latestHudLine = 'DO_MASTER_Grip_This? (auto freeze)';
+            scheduleAutoRelax();
           } else {
             statusEl.textContent = `Detecting... dominant=${dominant}, hist=[${lastGroups.join(', ')}]`;
             latestHudLine = `COCO-SSD running | dominant=${dominant}`;
@@ -2325,6 +2342,7 @@ ${detSummary}
 
     lockBtn.textContent = 'Lock (ON)';
     latestHudLine = 'Locked by user (no detection)';
+    scheduleAutoRelax();
     updateHud();
   });
 
@@ -2409,7 +2427,7 @@ ${detSummary}
     updateHud();
   });
 
-  relaxBtn.addEventListener('click', () => {
+  function performFullRelax() {
     lockActive = false;
     clearLockedVisual();
     lastGroups = [];
@@ -2429,6 +2447,7 @@ ${detSummary}
       clearTimeout(penDisplayTimer);
       penDisplayTimer = 0;
     }
+    clearAutoRelaxTimer();
 
     activateHand('none');
     lockBtn.textContent = 'Lock';
@@ -2444,6 +2463,10 @@ ${detSummary}
       });
     }
     updateHud();
+  }
+
+  relaxBtn.addEventListener('click', () => {
+    performFullRelax();
   });
 
   // ======== Start Camera ========
