@@ -157,14 +157,6 @@
       pointer-events: none;
     }
 
-    #overlaySvg {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 3;
-      pointer-events: none;
-    }
     #endCard {
       position: absolute;
       inset: 0;
@@ -255,38 +247,20 @@
       margin-top: 6px;
     }
 
-    /* =========================================
-       Hand SVG (ARCH style + 2-line wrist)
-    ========================================= */
-    .hand-svg { display: none; }
-    .hand-svg.active { display: block; }
-
-    /* palm + wrist */
-    .palm-line { stroke: #fff; stroke-width: 3; fill: none; }
-    .wrist-line { stroke: #fff; stroke-width: 4; }
-
-    /* fingers */
-    .finger { stroke: #ff0; stroke-width: 3; fill: none; }
-    .finger-joint { fill: #000; stroke: #ff0; stroke-width: 3; }
-
-    /* locked fingers (x2 width) */
-    .hand-svg.locked .finger,
-    .hand-svg.locked .finger-joint { stroke-width: 6; }
-
-    /* relaxed locked (全体を黄色に) */
-    #handRelaxed.locked line,
-    #handRelaxed.locked rect { stroke: #ff0; stroke-width: 6; }
-    #handRelaxed.locked circle { stroke: #ff0; stroke-width: 3; fill: #000; }
-
-    /* object colors */
-    .phone-body { fill: #00f; stroke: #00f; stroke-width: 2; }
-    .pen-body { stroke: #0f0; stroke-width: 4; fill: none; }
-    .key-body { fill: #0cf; stroke: #0cf; stroke-width: 2; }
-    .salute-line { stroke: #ccc; stroke-width: 4; }
-    .salute-palm { stroke: #666; stroke-width: 3; fill: none; }
-
-    /* HUD text in SVG */
-    #overlayHud { fill: #fff; font-size: 12px; }
+    /* HUD text overlay */
+    #overlayHud {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.55);
+      padding: 3px 8px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #fff;
+      pointer-events: none;
+      text-align: center;
+    }
 
     /* =========================================
        Result Text
@@ -298,6 +272,15 @@
       color: #ccc;
       min-height: 1.2em;
       white-space: pre-line;
+    }
+    body.no-text #resultArea,
+    body.no-text #status,
+    body.no-text #overlayHud {
+      visibility: hidden;
+    }
+    body.no-text #debugHud {
+      visibility: hidden;
+      display: none;
     }
 
     /* =========================================
@@ -330,6 +313,16 @@
       background: #555;
       color: #fff;
       cursor: pointer;
+    }
+    button.disabled-button {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    #miniOpenBtn.disabled-button,
+    #lockBtn.disabled-button,
+    #startCameraBtn.disabled-button {
+      opacity: 0.4;
+      cursor: not-allowed;
     }
     #startCameraBtn {
       margin-top: 10px;
@@ -671,26 +664,7 @@
           pointer-events: none;
         ">
 </canvas>
-    <svg id="overlaySvg"
-      viewBox="0 0 220 220"
-      preserveAspectRatio="xMidYMid meet"
-      style="
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 2;
-        pointer-events: none;
-      ">
-      <g id="handRelaxed" class="hand-svg active"></g>
-      <g id="handEgg" class="hand-svg"></g>
-      <g id="handPen" class="hand-svg"></g>
-      <g id="handPhone" class="hand-svg"></g>
-      <g id="handKey" class="hand-svg"></g>
-      <g id="handSalute" class="hand-svg"></g>
-      <text id="overlayHud" x="110" y="210" text-anchor="middle">Model: not loaded</text>
-    </svg>
+    <div id="overlayHud">Model: not loaded</div>
     <div id="endCard" aria-live="polite">
       <h3>End Camera</h3>
       <div id="endCardBody" class="end-copy"></div>
@@ -754,58 +728,6 @@ transform: translateX(-50%);
 
 <script>
 (() => {
-  // ===== PNG PRELOAD (lazy) =====
-  let HAND_IMAGES = null;
-  let handImagesReady = false;
-  let handImagesLoaded = false;
-  let handImagesLoadedCount = 0;
-  const HAND_IMAGES_TOTAL = 2;
-
-  function markHandImageLoaded(name) {
-    handImagesLoadedCount = Math.min(handImagesLoadedCount + 1, HAND_IMAGES_TOTAL);
-    if (handImagesLoadedCount >= HAND_IMAGES_TOTAL && !handImagesLoaded) {
-      handImagesLoaded = true;
-      appendInitLog('Hand overlay assets fully preloaded.');
-      updateHud();
-    }
-  }
-
-  function initHandImages() {
-    if (handImagesReady) {
-      appendInitLog('Images already initialized.');
-      return;
-    }
-    handImagesLoaded = false;
-    handImagesLoadedCount = 0;
-    HAND_IMAGES = {
-      fullopen: new Image(),
-      salute: new Image(),
-    };
-
-    HAND_IMAGES.fullopen.onload = () => {
-      console.log('fullopen.png preloaded');
-      appendInitLog('Image loaded: fullopen.png');
-      markHandImageLoaded('fullopen');
-    };
-    HAND_IMAGES.salute.onload = () => {
-      console.log('salute0.png preloaded');
-      appendInitLog('Image loaded: salute0.png');
-      markHandImageLoaded('salute');
-    };
-
-    HAND_IMAGES.fullopen.src = 'fullopen.png';
-    HAND_IMAGES.salute.src   = 'salute0.png';
-    handImagesReady = true;
-    initImagesDone = true;
-    appendInitLog('Images init requested.');
-  }
-
-  function handOverlayPreloadStatus() {
-    if (handImagesLoaded) return 'YES';
-    if (handImagesReady) return 'loading';
-    return 'pending';
-  }
-
   // ======== DOM references ========
   const video        = document.getElementById('video');
   const renderCanvas = document.getElementById('renderCanvas');
@@ -855,13 +777,21 @@ transform: translateX(-50%);
   const initLogEl = document.getElementById('initLog');
   const initLogWrapper = document.getElementById('initLogWrapper');
 
-  const handRelaxed  = document.getElementById('handRelaxed');
-  const handEgg      = document.getElementById('handEgg');
-  const handPen      = document.getElementById('handPen');
-  const handPhone    = document.getElementById('handPhone');
-  const handKey      = document.getElementById('handKey');
-  const handSalute   = document.getElementById('handSalute');
-  const allHands     = [handRelaxed, handEgg, handPen, handPhone, handKey, handSalute];
+  const ASSET_IMAGE_FILES = [
+    'phone1(2).png','egg0.png','egg1.png','egg2.png','fullopen.png',
+    'key0.png','key1(1).png','key1.png','key2.png','pen0.png',
+    'pen1(1).png','pen1.png','pen2.png','phone0.png','phone1(1).png',
+    'phone1.png','phone2.png','salute0.png'
+  ];
+  let assetsReady = false;
+  let assetsLoadedCount = 0;
+  let assetsPreloadStarted = false;
+
+  function handOverlayPreloadStatus() {
+    if (assetsReady) return 'YES';
+    if (assetsLoadedCount > 0) return 'loading';
+    return 'pending';
+  }
 
   // DEBUG HUD DOM
   const debugHud   = document.getElementById('debugHud');
@@ -976,8 +906,49 @@ transform: translateX(-50%);
   let keyWindow = [];
   let initLogVisible = false;
   const AUTO_FREEZE_MS = 20 * 1000;
-  let autoRelaxTimer = null;
+  const HOLD_MS = 2000;
   let statusMuteTimer = null;
+  let textHoldTimer = null;
+  let textHoldUntil = 0;
+
+  let textBlocked = false;
+
+  function shouldShowText() {
+    return !textBlocked && currentGroup === 'none';
+  }
+
+  function setStatusText(msg) {
+    if (!statusEl) return;
+    if (shouldShowText()) {
+      statusEl.textContent = msg;
+    }
+  }
+
+  function setResultText(msg) {
+    if (!resultEl) return;
+    if (shouldShowText()) {
+      resultEl.textContent = msg;
+    }
+  }
+
+  function setHudText(msg) {
+    if (!hudText) return;
+    hudText.textContent = shouldShowText() ? msg : '';
+  }
+
+  function setTextBlocking(shouldBlock) {
+    if (textBlocked === shouldBlock) return;
+    textBlocked = shouldBlock;
+    document.body.classList.toggle('no-text', shouldBlock);
+      if (shouldBlock) {
+        if (statusEl) statusEl.textContent = '';
+        if (resultEl) resultEl.textContent = '';
+        if (hudText) hudText.textContent = '';
+      } else if (hudText) {
+        latestHudLine = makeSvgHudLine();
+        setHudText(latestHudLine);
+      }
+    }
 
   function appendInitLog(msg) {
     if (!initLogEnabled) return;
@@ -988,24 +959,10 @@ transform: translateX(-50%);
     initLogEl.scrollTop = initLogEl.scrollHeight;
   }
 
-  function clearAutoRelaxTimer() {
-    if (autoRelaxTimer) {
-      clearTimeout(autoRelaxTimer);
-      autoRelaxTimer = null;
-    }
-  }
-
-  function scheduleAutoRelax(ms = AUTO_FREEZE_MS) {
-    clearAutoRelaxTimer();
-    autoRelaxTimer = setTimeout(() => {
-      performFullRelax();
-    }, ms);
-  }
-
   function enterStaticMode() {
     if (freezeActive) return;
     freezeActive = true;
-    statusEl.textContent = '姿勢を固定しました。Full Relaxで解除できます。';
+    setStatusText('姿勢を固定しました。Full Relaxで解除できます。');
     latestHudLine = 'Static pose locked (Full Relax to exit)';
     updateHud();
   }
@@ -1039,12 +996,51 @@ transform: translateX(-50%);
 
   function setCameraButtonState(on) {
     cameraActive = on;
-    startCamBtn.textContent = on ? 'End Camera' : 'Start Camera';
     startCamBtn.classList.toggle('is-on', on);
+    refreshCameraButtonLabel();
   }
 
   // BASIC visibility
   let showBasic = true;
+
+  function refreshCameraButtonLabel() {
+    const loading = !assetsReady && !cameraActive;
+    startCamBtn.disabled = loading;
+    startCamBtn.classList.toggle('disabled-button', loading);
+    startCamBtn.textContent = loading ? '画像読み込み中' : (cameraActive ? 'End Camera' : 'Start Camera');
+  }
+
+  function updateAssetControls() {
+    const disabled = !assetsReady;
+    [miniOpenBtn, lockBtn].forEach(btn => {
+      if (!btn) return;
+      btn.disabled = disabled;
+      btn.classList.toggle('disabled-button', disabled);
+    });
+    refreshCameraButtonLabel();
+  }
+
+  function onAssetLoaded(name, success = true) {
+    assetsLoadedCount = Math.min(assetsLoadedCount + 1, ASSET_IMAGE_FILES.length);
+    appendInitLog(`Asset ${success ? 'loaded' : 'failed'}: ${name} (${assetsLoadedCount}/${ASSET_IMAGE_FILES.length})`);
+    if (assetsLoadedCount >= ASSET_IMAGE_FILES.length) {
+      assetsReady = true;
+      appendInitLog('All assets loaded.');
+      updateAssetControls();
+    }
+  }
+
+  function preloadAssets() {
+    if (assetsPreloadStarted) return;
+    assetsPreloadStarted = true;
+    ASSET_IMAGE_FILES.forEach(name => {
+      const img = new Image();
+      img.onload = () => onAssetLoaded(name, true);
+      img.onerror = () => onAssetLoaded(name, false);
+      img.src = name;
+    });
+    updateAssetControls();
+  }
 
   // ===== Custom Model (DIY deploy) =====
   const CUSTOM_MODEL_KEY = 'indexeddb://fcai-custom-classifier-v1';
@@ -1117,6 +1113,7 @@ transform: translateX(-50%);
   }
 
   const handPngMap = {
+    simRelaxed:{ src: 'fullopen.png', width: '60%', left: '35%', top: '25%' },
     simEgg:   { src: 'egg1.png', width: '90%', left: '40%' },
     simPen:   { src: 'pen1.png', width: '60%', left: '38%' },
     simPhone: { src: 'phone1.png', width: '90%', left: '40%', top: '20%' },
@@ -1124,6 +1121,14 @@ transform: translateX(-50%);
     simSalute:{ src: 'salute0.png', width: '60%', left: '35%' }
   };
   window.handPngMap = handPngMap;
+  const HAND_PNG_BY_GROUP = {
+    none: handPngMap.simRelaxed,
+    egg: handPngMap.simEgg,
+    pen: handPngMap.simPen,
+    phone: handPngMap.simPhone,
+    key: handPngMap.simKey,
+    salute: handPngMap.simSalute
+  };
 
   function applyHandPngConfig(cfg) {
     if (!handPngEl || !cfg) return;
@@ -1143,9 +1148,9 @@ transform: translateX(-50%);
   }
 
   function triggerEggAuto(now) {
-    // EGGだけ命名ルールが逆のため、認識時は egg0 を表示する
+    // EGGは認識時に egg1 を表示する
     applyHandPngConfig({
-      src: 'egg0.png',
+      src: 'egg1.png',
       width: '90%',
       left: '40%',
       top: '25%'
@@ -1174,41 +1179,15 @@ transform: translateX(-50%);
   }
 
   // ======== Helper: hand display ========
-function activateHand(group) {
-  allHands.forEach(g => g.classList.remove('active'));
-
-  let target;
-  if (group === 'egg')        target = handEgg;
-  else if (group === 'pen')   target = handPen;
-  else if (group === 'phone') target = handPhone;
-  else if (group === 'key')   target = handKey;
-  else if (group === 'salute')target = handSalute;
-  else                        target = handRelaxed;
-
-  target.classList.add('active');
-  currentGroup = group;
-
-  if (group === 'salute') {
-    applyHandPngConfig(handPngMap.simSalute);
+  function activateHand(group, { updateText = true } = {}) {
+    currentGroup = group;
+    if (updateText) setTextBlocking(group !== 'none');
+    const cfg = HAND_PNG_BY_GROUP[group] || handPngMap.simRelaxed;
+    applyHandPngConfig(cfg);
   }
 
-// ===== PNG overlay control =====
-const restImg   = document.getElementById("handRestImg");
-const saluteImg = document.getElementById("handSaluteImg");
-
-if (restImg && saluteImg) {
-  // PNGはいったん全部消す
-  restImg.style.display   = "none";
-  saluteImg.style.display = "none";
-
-  // salute のときだけ PNG を出す
-  if (group === "salute") {
-    saluteImg.style.display = "block";
-  }
-}
-}
   function clearLockedVisual() {
-    allHands.forEach(g => g.classList.remove('locked'));
+    // no-op (PNG only)
   }
 
   // ======== Helper: bbox colors ========
@@ -1255,8 +1234,8 @@ if (restImg && saluteImg) {
   async function loadModelIfNeeded() {
     if (model) return;
 
-    statusEl.textContent = 'Loading object detection model (COCO-SSD)...';
-    hudText.textContent = 'Loading COCO-SSD...';
+    setStatusText('Loading object detection model (COCO-SSD)...');
+    setHudText('Loading COCO-SSD...');
 
     try {
       if (window.tf && tf.getBackend && tf.setBackend) {
@@ -1272,9 +1251,9 @@ if (restImg && saluteImg) {
 
     model = await cocoSsd.load();
 
-    statusEl.textContent = 'Model loaded. Tap "Start Camera".';
+    setStatusText('Model loaded. Tap "Start Camera".');
     latestHudLine = 'Model: COCO-SSD loaded';
-    hudText.textContent = latestHudLine;
+    setHudText(latestHudLine);
   }
 
   // ======== Camera: populate with deviceId ========
@@ -1287,7 +1266,7 @@ if (restImg && saluteImg) {
 
   async function populateCameras() {
     if (!navigator.mediaDevices?.enumerateDevices) {
-      statusEl.textContent = 'enumerateDevices() not supported on this browser.';
+      setStatusText('enumerateDevices() not supported on this browser.');
       camsSnapshot = [];
       return;
     }
@@ -1314,7 +1293,7 @@ if (restImg && saluteImg) {
       opt.value = '';
       opt.textContent = 'No camera found';
       cameraSelect.appendChild(opt);
-      statusEl.textContent = 'No videoinput devices.';
+      setStatusText('No videoinput devices.');
       return;
     }
 
@@ -1344,7 +1323,7 @@ if (restImg && saluteImg) {
       cameraSelect.value = cams[0].deviceId;
     }
 
-    statusEl.textContent = `Cameras ready: ${cams.length}`;
+    setStatusText(`Cameras ready: ${cams.length}`);
   }
 
   // ======== Canvas sizing & cover transform ========
@@ -1387,6 +1366,7 @@ if (restImg && saluteImg) {
 
   // ======== Draw video + boxes ========
   function drawBoxes(objects, tfm) {
+    const showText = !textBlocked;
     for (const obj of objects) {
       if (obj.group === 'basic' && !showBasic) continue;
 
@@ -1409,14 +1389,44 @@ if (restImg && saluteImg) {
       renderCtx.fill();
       renderCtx.stroke();
 
-      const ratio = (w / Math.max(1, h)).toFixed(2);
-      const shortSide = Math.round(Math.min(w, h));
-      const label = `${obj.displayName} ${(obj.score * 100).toFixed(1)}%  r=${ratio}  s=${shortSide}px`;
+      if (showText) {
+        const ratio = (w / Math.max(1, h)).toFixed(2);
+        const shortSide = Math.round(Math.min(w, h));
+        const label = `${obj.displayName} ${(obj.score * 100).toFixed(1)}%  r=${ratio}  s=${shortSide}px`;
 
-      renderCtx.font = '16px Arial';
-      renderCtx.fillStyle = text;
-      renderCtx.fillText(label, dx + 4, Math.max(18, dy + 18));
+        renderCtx.font = '16px Arial';
+        renderCtx.fillStyle = text;
+        renderCtx.fillText(label, dx + 4, Math.max(18, dy + 18));
+      }
     }
+  }
+
+  function finishHeldText() {
+    if (textHoldTimer) {
+      clearTimeout(textHoldTimer);
+      textHoldTimer = null;
+    }
+    textHoldUntil = 0;
+    if (currentGroup === 'none') {
+      setTextBlocking(false);
+    }
+  }
+
+  function blockTextFor(ms) {
+    const now = performance.now();
+    textHoldUntil = Math.max(textHoldUntil, now) + ms;
+    setTextBlocking(true);
+    if (textHoldTimer) clearTimeout(textHoldTimer);
+    textHoldTimer = setTimeout(() => {
+      textHoldTimer = null;
+      const current = performance.now();
+      if (current >= textHoldUntil) {
+        textHoldUntil = 0;
+        if (currentGroup === 'none') {
+          setTextBlocking(false);
+        }
+      }
+    }, textHoldUntil - now);
   }
 
   function drawLoop() {
@@ -1450,7 +1460,7 @@ if (restImg && saluteImg) {
 
     if (mirrored) renderCtx.restore();
 
-    hudText.textContent = latestHudLine;
+    setHudText(latestHudLine);
   }
 
   // ===== Custom Model helpers =====
@@ -1590,55 +1600,62 @@ if (restImg && saluteImg) {
 
       const now = performance.now();
 
+      // Blocking window (due to non-Relax) pauses detection completely
       // DIY mode pauses fcAI state changes, but keeps camera alive
       if (diyActive) {
         latestHudLine = 'DIY Mode: fcAI paused (camera continues).';
-        setTimeout(loop, 200);
-        return;
-      }
+      setTimeout(loop, 200);
+      return;
+    }
 
       if (detectPausedByPen) {
         latestHudLine = 'Pen detected: overlay shown (paused until relax)';
-        setTimeout(loop, 200);
-        return;
-      }
+      setTimeout(loop, 200);
+      return;
+    }
 
       if (detectPausedByKey) {
         latestHudLine = 'Key detected: overlay shown (paused until relax)';
-        setTimeout(loop, 200);
-        return;
-      }
+      setTimeout(loop, 200);
+      return;
+    }
 
       if (now < detectPauseUntil) {
         latestHudLine = 'Phone detected: overlay shown (detection paused)';
-        setTimeout(loop, 200);
-        return;
-      }
+      setTimeout(loop, 200);
+      return;
+    }
 
       // Demo freeze keeps current pose visible
       if (now < demoUntil) {
         latestHudLine = 'DEMO freeze (2s)';
-        setTimeout(loop, 200);
-        return;
-      }
+      setTimeout(loop, 200);
+      return;
+    }
 
       if (lockActive) {
         latestHudLine = 'Locked: detection paused.';
-        setTimeout(loop, 200);
-        return;
-      }
+      setTimeout(loop, 200);
+      return;
+    }
 
       if (now < freezeUntil) {
         latestObjects = freezeBoxes;
         latestHudLine = 'DO_MASTER_Grip_This? (auto freeze)';
-        setTimeout(loop, 200);
-        return;
-      }
+      setTimeout(loop, 200);
+      return;
+    }
+
+      if (currentGroup !== 'none') {
+        // stop running detect() until Full Relax resets the state
+      setTimeout(loop, 200);
+      return;
+    }
 
       if (!model || !video.videoWidth || video.readyState < 2) {
-        setTimeout(loop, 200);
-        return;
-      }
+      setTimeout(loop, 200);
+      return;
+    }
 
       try {
         const predictions = await model.detect(video);
@@ -1719,6 +1736,13 @@ if (restImg && saluteImg) {
         const penSeen = objects.some(o => o.group === 'pen');
         const keySeen = objects.some(o => o.group === 'key');
 
+        if (dominant !== 'none') {
+          setTextBlocking(true);
+        }
+        if (dominant === 'none' && currentGroup !== 'none') {
+          dominant = currentGroup;
+        }
+
         lastDominant = dominant;
         lastBestScore = bestScore;
         lastObjectsCount = objects.length;
@@ -1727,13 +1751,13 @@ if (restImg && saluteImg) {
           if (!phoneHoldStart) phoneHoldStart = now;
         if (!phoneAutoActive && (now - phoneHoldStart) >= 200) {
             activateHand('phone');
-            resultEl.textContent = 'State: PHONE group detected';
+            setResultText('State: PHONE group detected');
             triggerPhoneAuto(now);
-            statusEl.textContent = 'PHONE detected: overlay ON (paused 1s).';
+            setStatusText('PHONE detected: overlay ON (paused 1s).');
             latestHudLine = 'Phone detected: overlay ON (paused 1s)';
-            setTimeout(loop, 200);
-            return;
-          }
+      setTimeout(loop, 200);
+      return;
+    }
         } else {
           phoneHoldStart = 0;
         }
@@ -1742,11 +1766,11 @@ if (restImg && saluteImg) {
           if (!eggHoldStart) eggHoldStart = now;
           if (!eggAutoActive && (now - eggHoldStart) >= 200) {
             triggerEggAuto(now);
-            statusEl.textContent = 'EGG detected: overlay ON (paused 1s).';
+            setStatusText('EGG detected: overlay ON (paused 1s).');
             latestHudLine = 'Egg detected: overlay ON (paused 1s)';
-            setTimeout(loop, 200);
-            return;
-          }
+      setTimeout(loop, 200);
+      return;
+    }
         } else {
           eggHoldStart = 0;
         }
@@ -1761,7 +1785,7 @@ if (restImg && saluteImg) {
           triggerKeyAuto(now);
           appendInitLog(`Key window: trigger (${count}/${keyWindowSize})`);
           keyWindow = [];
-          statusEl.textContent = 'KEY detected: overlay ON (paused until relax).';
+          setStatusText('KEY detected: overlay ON (paused until relax).');
           latestHudLine = 'Key detected: overlay ON (paused until relax)';
           setTimeout(loop, 200);
           return;
@@ -1780,7 +1804,7 @@ if (restImg && saluteImg) {
           penHoldStart = 0;
           penLastSeen = 0;
           penWindow = [];
-          statusEl.textContent = 'PEN detected: overlay ON (paused until relax).';
+          setStatusText('PEN detected: overlay ON (paused until relax).');
           latestHudLine = 'Pen detected: overlay ON (paused until relax)';
           setTimeout(loop, 200);
           return;
@@ -1796,7 +1820,7 @@ if (restImg && saluteImg) {
             const elapsedMs = Math.round(now - penHoldStart);
             triggerPenAuto(now);
             appendInitLog(`Pen hold: trigger (>=${penTriggerMs}ms, grace=${penGraceMs}ms, elapsed=${elapsedMs}ms)`);
-            statusEl.textContent = 'PEN detected: overlay ON (paused until relax).';
+            setStatusText('PEN detected: overlay ON (paused until relax).');
             latestHudLine = 'Pen detected: overlay ON (paused until relax)';
             setTimeout(loop, 200);
             return;
@@ -1815,13 +1839,15 @@ if (restImg && saluteImg) {
         lastGroups.push(dominant);
         if (lastGroups.length > 5) lastGroups.shift();
 
-        activateHand(dominant);
-        resultEl.textContent =
+        activateHand(dominant, { updateText: false });
+        setResultText(
           dominant === 'none'
             ? 'State: RELAXED'
-            : `State: ${dominant.toUpperCase()} group detected`;
+            : `State: ${dominant.toUpperCase()} group detected`
+        );
 
         if (dominant !== 'none') {
+          blockTextFor(HOLD_MS);
           const count = lastGroups.filter(g => g === dominant).length;
           if (count >= 3) {
             freezeGroup = dominant;
@@ -1829,24 +1855,23 @@ if (restImg && saluteImg) {
             if (freezeBoxes.length === 0) freezeBoxes = objects.slice();
             freezeUntil = now + AUTO_FREEZE_MS;
             enterStaticMode();
-            scheduleAutoRelax();
           } else {
-            statusEl.textContent = `Detecting... dominant=${dominant}, hist=[${lastGroups.join(', ')}]`;
+            setStatusText(`Detecting... dominant=${dominant}, hist=[${lastGroups.join(', ')}]`);
             latestHudLine = `COCO-SSD running | dominant=${dominant}`;
           }
         } else {
-          statusEl.textContent = 'Detecting... (no stable object yet)';
+          setStatusText('Detecting... (no stable object yet)');
           latestHudLine = 'COCO-SSD running | dominant=none';
         }
 
       } catch (err) {
         console.error(err);
         lastDetectError = String(err && err.message ? err.message : err);
-        statusEl.textContent = 'Detection error occurred.';
+        setStatusText('Detection error occurred.');
         latestHudLine = 'Detection error';
       }
 
-      setTimeout(loop, 200);
+      setTimeout(loop, 333);
     };
 
     loop();
@@ -1881,6 +1906,23 @@ if (restImg && saluteImg) {
       ? ` | Custom=${lastCustom.label} ${(lastCustom.score*100).toFixed(0)}%${lastCustom.used ? ' *' : ''}`
       : '';
     return `COCO-SSD | ${w}x${h} ${fps}fps ${fm} | backend=${tfb}${cpart}`;
+  }
+
+  let handImagesInitialized = false;
+
+  function initHandImages() {
+    if (handImagesInitialized) {
+      appendInitLog('Images already initialized.');
+      return;
+    }
+    handImagesInitialized = true;
+    appendInitLog('Images init requested.');
+
+    ['fullopen.png', 'salute0.png'].forEach(name => {
+      const img = new Image();
+      img.onload = () => appendInitLog(`Image loaded: ${name}`);
+      img.src = name;
+    });
   }
 
   function initImagesStep() {
@@ -1944,13 +1986,13 @@ if (restImg && saluteImg) {
     }
 
     appendInitLog('Init all: start');
-    statusEl.textContent = 'Initializing assets & camera list...';
+    setStatusText('Initializing assets & camera list...');
     initImagesStep();
 
     await initCamerasStep();
     await initCustomModelStep();
 
-    statusEl.textContent = 'Init done. Tap "Start Camera".';
+    setStatusText('Init done. Tap "Start Camera".');
     appendInitLog('Init all: done');
     updateHud();
   }
@@ -1965,12 +2007,12 @@ if (restImg && saluteImg) {
       }
 
       if (!cameraSelect.value) {
-        statusEl.textContent = 'Preparing camera list...';
+        setStatusText('Preparing camera list...');
         await populateCameras();
       }
 
       const deviceId = cameraSelect.value;
-      statusEl.textContent = 'Requesting camera...';
+      setStatusText('Requesting camera...');
 
       if (!deviceId) {
         appendInitLog('Start camera: no deviceId (using default video=true)');
@@ -2012,9 +2054,9 @@ if (restImg && saluteImg) {
         await video.play();
 
         latestHudLine = makeSvgHudLine();
-        hudText.textContent = latestHudLine;
+        setHudText(latestHudLine);
 
-        statusEl.textContent = 'Camera started. Show objects in front of the camera.';
+        setStatusText('Camera started. Show objects in front of the camera.');
         setCameraButtonState(true);
 
         if (!drawRunning) {
@@ -2030,9 +2072,9 @@ if (restImg && saluteImg) {
     } catch (e) {
       console.error(e);
       appendInitLog(`Start camera: error (${e && e.name ? e.name : 'error'})`);
-      statusEl.textContent = 'Camera not available. Please check permissions / HTTPS / settings.';
+      setStatusText('Camera not available. Please check permissions / HTTPS / settings.');
       latestHudLine = 'Camera error';
-      hudText.textContent = latestHudLine;
+      setHudText(latestHudLine);
       setCameraButtonState(false);
     }
   }
@@ -2045,9 +2087,9 @@ if (restImg && saluteImg) {
       stream = null;
     }
     video.srcObject = null;
-    statusEl.textContent = 'Camera stopped.';
+    setStatusText('Camera stopped.');
     latestHudLine = 'Camera stopped';
-    hudText.textContent = latestHudLine;
+    setHudText(latestHudLine);
     setCameraButtonState(false);
     renderCtx.clearRect(0, 0, renderCanvas.width, renderCanvas.height);
     showEndCard();
@@ -2156,6 +2198,11 @@ ${detSummary}
   }
 
   function updateHud() {
+    if (textBlocked) {
+      debugHud.style.display = 'none';
+      debugHudSelect.value = 'off';
+      return;
+    }
     if (debugHud.style.display === 'none') return;
     const text = buildHudText();
     lastHudFullText = text;
@@ -2167,7 +2214,7 @@ ${detSummary}
       const text = lastHudFullText || buildHudText();
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text);
-        statusEl.textContent = 'DEBUG HUD copied to clipboard.';
+        setStatusText('DEBUG HUD copied to clipboard.');
       } else {
         // fallback
         const ta = document.createElement('textarea');
@@ -2176,18 +2223,18 @@ ${detSummary}
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        statusEl.textContent = 'DEBUG HUD copied (fallback).';
+        setStatusText('DEBUG HUD copied (fallback).');
       }
     } catch (e) {
       console.warn(e);
-      statusEl.textContent = 'Copy failed (browser restriction). Use Log instead.';
+      setStatusText('Copy failed (browser restriction). Use Log instead.');
     }
   }
 
   function logHud() {
     const text = lastHudFullText || buildHudText();
     console.log('=== DEBUG HUD ===\n' + text);
-    statusEl.textContent = 'DEBUG HUD printed to console.';
+    setStatusText('DEBUG HUD printed to console.');
   }
 
   // ======== UI: menu, sliders ========
@@ -2196,7 +2243,7 @@ ${detSummary}
   });
 
   refreshCamsBtn.addEventListener('click', async () => {
-    statusEl.textContent = 'Refreshing camera list...';
+    setStatusText('Refreshing camera list...');
     await populateCameras();
     updateHud();
   });
@@ -2208,7 +2255,7 @@ ${detSummary}
 
   basicSelect.addEventListener('change', () => {
     showBasic = (basicSelect.value === 'on');
-    statusEl.textContent = showBasic ? 'BASIC boxes: ON' : 'BASIC boxes: OFF';
+    setStatusText(showBasic ? 'BASIC boxes: ON' : 'BASIC boxes: OFF');
     updateHud();
   });
 
@@ -2216,9 +2263,9 @@ ${detSummary}
     useCustomModel = (useCustomSelect.value === 'on');
     if (useCustomModel) {
       const ok = await loadCustomModelIfAvailable();
-      statusEl.textContent = ok ? 'Custom model loaded (DIY).' : 'Custom model not found yet. Use DIY Mode to deploy.';
+      setStatusText(ok ? 'Custom model loaded (DIY).' : 'Custom model not found yet. Use DIY Mode to deploy.');
     } else {
-      statusEl.textContent = 'Custom model OFF.';
+      setStatusText('Custom model OFF.');
     }
     latestHudLine = makeSvgHudLine();
     updateHud();
@@ -2247,45 +2294,45 @@ ${detSummary}
   simEggBtn.addEventListener('click', () => {
     activateHand('egg');
     applyHandPngConfig({
-      src: 'egg0.png',
+      src: 'egg1.png',
       width: '90%',
       left: '40%',
       top: '25%'
     });
-    resultEl.textContent = 'State: EGG (simulation)';
-    statusEl.textContent = 'Simulation: EGG (fragile small items)';
+    setResultText('State: EGG (simulation)');
+    setStatusText('Simulation: EGG (fragile small items)');
     demoFreeze(2000);
     updateHud();
   });
   simPenBtn.addEventListener('click', () => {
     activateHand('pen');
     applyHandPngConfig(handPngMap.simPen);
-    resultEl.textContent = 'State: PEN (simulation)';
-    statusEl.textContent = 'Simulation: Pen grip';
+    setResultText('State: PEN (simulation)');
+    setStatusText('Simulation: Pen grip');
     demoFreeze(2000);
     updateHud();
   });
   simPhoneBtn.addEventListener('click', () => {
     activateHand('phone');
     applyHandPngConfig(handPngMap.simPhone);
-    resultEl.textContent = 'State: PHONE (simulation)';
-    statusEl.textContent = 'Simulation: Phone support';
+    setResultText('State: PHONE (simulation)');
+    setStatusText('Simulation: Phone support');
     demoFreeze(2000);
     updateHud();
   });
   simKeyBtn.addEventListener('click', () => {
     activateHand('key');
     applyHandPngConfig(handPngMap.simKey);
-    resultEl.textContent = 'State: KEY (simulation)';
-    statusEl.textContent = 'Simulation: Key pinch';
+    setResultText('State: KEY (simulation)');
+    setStatusText('Simulation: Key pinch');
     demoFreeze(2000);
     updateHud();
   });
   simSaluteBtn.addEventListener('click', () => {
     activateHand('salute');
     applyHandPngConfig(handPngMap.simSalute);
-    resultEl.textContent = 'State: SALUTE (simulation)';
-    statusEl.textContent = 'Simulation: Salute pose';
+    setResultText('State: SALUTE (simulation)');
+    setStatusText('Simulation: Salute pose');
     demoFreeze(2000);
     updateHud();
   });
@@ -2293,10 +2340,11 @@ ${detSummary}
   // ======== Buttons: Lock / Mini-Open / Full Relax ========
   lockBtn.addEventListener('click', () => {
     lockActive = true;
+    blockTextFor(20 * 1000);
     if (currentGroup === 'salute') {
       activateHand('salute');
       lockBtn.textContent = 'Lock (ON)';
-      statusEl.textContent = 'SALUTE LOCK. Detection paused.';
+      setStatusText('SALUTE LOCK. Detection paused.');
       latestHudLine = 'Locked by user (no detection)';
       updateHud();
       return;
@@ -2333,39 +2381,31 @@ ${detSummary}
     }
 
     if (currentGroup === 'none') {
-      handRelaxed.classList.add('locked');
-      statusEl.textContent = 'RELAXED LOCK. Detection paused.';
+      setStatusText('RELAXED LOCK. Detection paused.');
     } else if (currentGroup === 'egg') {
-      handEgg.classList.add('locked'); // locked will make yellow thicker (by CSS for .finger only; here it's gray lines)
-      // For EGG lock spec: white 2x thickness. We implement via inline class change:
-      handEgg.classList.add('locked');
-      statusEl.textContent = 'EGG LOCK. Detection paused.';
+      setStatusText('EGG LOCK. Detection paused.');
     } else if (currentGroup === 'pen') {
-      handPen.classList.add('locked');
-      statusEl.textContent = 'PEN LOCK. Detection paused.';
+      setStatusText('PEN LOCK. Detection paused.');
     } else if (currentGroup === 'phone') {
-      handPhone.classList.add('locked');
-      statusEl.textContent = 'PHONE LOCK. Detection paused.';
+      setStatusText('PHONE LOCK. Detection paused.');
     } else if (currentGroup === 'key') {
-      handKey.classList.add('locked');
-      statusEl.textContent = 'KEY LOCK. Detection paused.';
+      setStatusText('KEY LOCK. Detection paused.');
     } else if (currentGroup === 'salute') {
-      handSalute.classList.add('locked');
-      statusEl.textContent = 'SALUTE LOCK. Detection paused.';
+      setStatusText('SALUTE LOCK. Detection paused.');
     }
 
     lockBtn.textContent = 'Lock (ON)';
     enterStaticMode();
-    scheduleAutoRelax();
     updateHud();
   });
 
   miniOpenBtn.addEventListener('click', () => {
+    blockTextFor(20 * 1000);
     if (currentGroup === 'salute') {
       lockActive = true;
       activateHand('salute');
       lockBtn.textContent = 'Lock (ON)';
-      statusEl.textContent = 'SALUTE LOCK. Detection paused.';
+      setStatusText('SALUTE LOCK. Detection paused.');
       latestHudLine = 'Locked by user (no detection)';
       updateHud();
       return;
@@ -2380,7 +2420,7 @@ ${detSummary}
         top: handPngEl?.style.top || '20%'
       });
       lockBtn.textContent = 'Lock (ON)';
-      statusEl.textContent = 'Mini-Open: phone image updated.';
+      setStatusText('Mini-Open: phone image updated.');
       latestHudLine = 'Mini-Open (phone image swap)';
       updateHud();
       return;
@@ -2395,7 +2435,7 @@ ${detSummary}
         top: handPngEl?.style.top || '25%'
       });
       lockBtn.textContent = 'Lock (ON)';
-      statusEl.textContent = 'Mini-Open: pen image updated.';
+      setStatusText('Mini-Open: pen image updated.');
       latestHudLine = 'Mini-Open (pen image swap)';
       updateHud();
       return;
@@ -2410,33 +2450,33 @@ ${detSummary}
         top: handPngEl?.style.top || '25%'
       });
       lockBtn.textContent = 'Lock (ON)';
-      statusEl.textContent = 'Mini-Open: key image updated.';
+      setStatusText('Mini-Open: key image updated.');
       latestHudLine = 'Mini-Open (key image swap)';
       updateHud();
       return;
     }
     if (currentGroup === 'egg') {
-      // Mini-Open時は例外的に egg1 を表示（EGGのみ特殊ルール）
+      // Mini-Open時は例外的に egg0 を表示（EGGのみ特殊ルール）
       lockActive = true;
       activateHand('egg');
       applyHandPngConfig({
-        src: 'egg1.png',
+        src: 'egg0.png',
         width: handPngEl?.style.width || '90%',
         left: handPngEl?.style.left || '40%',
         top: handPngEl?.style.top || '25%'
       });
       lockBtn.textContent = 'Lock (ON)';
-      statusEl.textContent = 'Mini-Open: egg image updated.';
+      setStatusText('Mini-Open: egg image updated.');
       latestHudLine = 'Mini-Open (egg image swap)';
       updateHud();
       return;
     }
     if (!lockActive) {
-      statusEl.textContent = 'Mini-Open: no lock active.';
+      setStatusText('Mini-Open: no lock active.');
       return;
     }
     clearLockedVisual();
-    statusEl.textContent = 'Mini-Open: thickness reset (you can Lock again).';
+    setStatusText('Mini-Open: thickness reset (you can Lock again).');
     latestHudLine = 'Mini-Open (visual only)';
     updateHud();
   });
@@ -2462,12 +2502,12 @@ ${detSummary}
       clearTimeout(penDisplayTimer);
       penDisplayTimer = 0;
     }
-    clearAutoRelaxTimer();
 
+    finishHeldText();
     activateHand('none');
     lockBtn.textContent = 'Lock';
-    resultEl.textContent = 'State: RELAXED';
-    statusEl.textContent = 'Full Relax: lock & freeze cleared. Detection resumes.';
+    setResultText('State: RELAXED');
+    setStatusText('Full Relax: lock & freeze cleared. Detection resumes.');
     latestHudLine = makeSvgHudLine();
     if (handPngEl) {
       applyHandPngConfig({
@@ -2528,7 +2568,7 @@ ${detSummary}
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text);
-        statusEl.textContent = 'Init Log copied to clipboard.';
+        setStatusText('Init Log copied to clipboard.');
       } else {
         const ta = document.createElement('textarea');
         ta.value = text;
@@ -2536,11 +2576,11 @@ ${detSummary}
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        statusEl.textContent = 'Init Log copied (fallback).';
+        setStatusText('Init Log copied (fallback).');
       }
     } catch (e) {
       console.warn(e);
-      statusEl.textContent = 'Copy failed (browser restriction).';
+      setStatusText('Copy failed (browser restriction).');
     }
   });
 
@@ -2593,11 +2633,11 @@ ${detSummary}
       playJingle('enter');
       latestObjects = [];
       appendInitLog('DIY enter: fcAI paused (camera continues).');
-      statusEl.textContent = 'DIY Mode: fcAI paused (camera continues).';
+      setStatusText('DIY Mode: fcAI paused (camera continues).');
     } else {
       playJingle('exit');
       appendInitLog('DIY exit: fcAI resumed.');
-      statusEl.textContent = 'Returned to fcAI mode.';
+      setStatusText('Returned to fcAI mode.');
     }
     updateHud();
   }
@@ -2857,7 +2897,7 @@ ${detSummary}
     useCustomModel = true;
     useCustomSelect.value = 'on';
     const ok = await loadCustomModelIfAvailable();
-    statusEl.textContent = ok ? 'Approved: Custom model ON.' : 'Approved, but load failed. Try Use Custom Model ON again.';
+    setStatusText(ok ? 'Approved: Custom model ON.' : 'Approved, but load failed. Try Use Custom Model ON again.');
     setDiyActive(false);
     latestHudLine = makeSvgHudLine();
     updateHud();
@@ -2880,6 +2920,8 @@ ${detSummary}
     showBasic = (basicSelect.value === 'on');
     useCustomModel = (useCustomSelect.value === 'on');
 
+    preloadAssets();
+
     // preload hand overlay art right away so buttons feel responsive
     initHandImages();
     setInitLogVisible(false);
@@ -2887,7 +2929,7 @@ ${detSummary}
     // Default HUD OFF (menu selectable)
     setHudVisible(false);
     updateHud();
-    statusEl.textContent = 'Ready. Tap "Start Camera" to initialize.';
+    setStatusText('Ready. Tap "Start Camera" to initialize.');
     setCameraButtonState(false);
     hideEndCard();
   });
