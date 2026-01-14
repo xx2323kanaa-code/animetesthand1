@@ -909,6 +909,7 @@ transform: translateX(-50%);
   let freezeUntil = 0;       // performance.now()
   let freezeGroup = 'none';
   let freezeBoxes = [];
+  let freezeActive = false;
 
   // demo freeze for buttons
   let demoUntil = 0;
@@ -976,6 +977,7 @@ transform: translateX(-50%);
   let initLogVisible = false;
   const AUTO_FREEZE_MS = 20 * 1000;
   let autoRelaxTimer = null;
+  let statusMuteTimer = null;
 
   function appendInitLog(msg) {
     if (!initLogEnabled) return;
@@ -998,6 +1000,14 @@ transform: translateX(-50%);
     autoRelaxTimer = setTimeout(() => {
       performFullRelax();
     }, ms);
+  }
+
+  function enterStaticMode() {
+    if (freezeActive) return;
+    freezeActive = true;
+    statusEl.textContent = '姿勢を固定しました。Full Relaxで解除できます。';
+    latestHudLine = 'Static pose locked (Full Relax to exit)';
+    updateHud();
   }
 
   function setInitLogVisible(on) {
@@ -1818,8 +1828,7 @@ if (restImg && saluteImg) {
             freezeBoxes = objects.filter(o => o.group === dominant);
             if (freezeBoxes.length === 0) freezeBoxes = objects.slice();
             freezeUntil = now + AUTO_FREEZE_MS;
-            statusEl.textContent = 'DO_MASTER_Grip_This? (auto freeze)';
-            latestHudLine = 'DO_MASTER_Grip_This? (auto freeze)';
+            enterStaticMode();
             scheduleAutoRelax();
           } else {
             statusEl.textContent = `Detecting... dominant=${dominant}, hist=[${lastGroups.join(', ')}]`;
@@ -2049,6 +2058,11 @@ if (restImg && saluteImg) {
   function boolMark(v) { return v ? 'YES' : 'NO'; }
 
   function buildHudText() {
+    if (freezeActive) {
+      return `=== STATIC POSE ===
+Pose frozen: ${freezeGroup.toUpperCase()} (Full Relax to exit)`;
+    }
+
     const ua = navigator.userAgent || '(no UA)';
     const proto = location.protocol;
     const secure = (typeof isSecureContext !== 'undefined') ? isSecureContext : false;
@@ -2341,7 +2355,7 @@ ${detSummary}
     }
 
     lockBtn.textContent = 'Lock (ON)';
-    latestHudLine = 'Locked by user (no detection)';
+    enterStaticMode();
     scheduleAutoRelax();
     updateHud();
   });
@@ -2430,6 +2444,7 @@ ${detSummary}
   function performFullRelax() {
     lockActive = false;
     clearLockedVisual();
+    freezeActive = false;
     lastGroups = [];
     freezeUntil = 0;
     freezeBoxes = [];
