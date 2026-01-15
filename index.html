@@ -910,8 +910,11 @@ transform: translateX(-50%);
   let statusMuteTimer = null;
   let textHoldTimer = null;
   let textHoldUntil = 0;
+  let phoneAnimTimeout = null;
+  let phoneAnimInterval = null;
 
   let textBlocked = false;
+  let staticDisplayPaused = false;
 
   function shouldShowText() {
     return !textBlocked && currentGroup === 'none';
@@ -949,6 +952,21 @@ transform: translateX(-50%);
         setHudText(latestHudLine);
       }
     }
+
+  function handleStaticOverlay(group) {
+    if (group === 'none') {
+      if (staticDisplayPaused) {
+        staticDisplayPaused = false;
+        latestHudLine = makeSvgHudLine();
+        setHudText(latestHudLine);
+        updateHud();
+      }
+      return;
+    }
+    staticDisplayPaused = true;
+    latestHudLine = `Static display: ${group.toUpperCase()} state`;
+    setHudText(latestHudLine);
+  }
 
   function appendInitLog(msg) {
     if (!initLogEnabled) return;
@@ -1112,10 +1130,11 @@ transform: translateX(-50%);
     return Math.max(100, userMs);
   }
 
+  const PHONE_ANIM_SEQUENCE = ['phone1.png', 'phone1(2).png', 'phone1(1).png'];
   const handPngMap = {
     simRelaxed:{ src: 'fullopen.png', width: '60%', left: '35%', top: '25%' },
-    simEgg:   { src: 'egg1.png', width: '90%', left: '40%' },
-    simPen:   { src: 'pen1.png', width: '60%', left: '38%' },
+    simEgg:   { src: 'egg0.png', width: '90%', left: '40%' },
+    simPen:   { src: 'pen1(1).png', width: '60%', left: '38%' },
     simPhone: { src: 'phone1.png', width: '90%', left: '40%', top: '20%' },
     simKey:   { src: 'key1(1).png', width: '60%', left: '35%' },
     simSalute:{ src: 'salute0.png', width: '60%', left: '35%' }
@@ -1130,6 +1149,42 @@ transform: translateX(-50%);
     salute: handPngMap.simSalute
   };
 
+  let phoneAnimTimeout = null;
+  let phoneAnimInterval = null;
+
+  function applyPhoneFrame(src) {
+    applyHandPngConfig({
+      src,
+      width: handPngMap.simPhone.width,
+      left: handPngMap.simPhone.left,
+      top: handPngMap.simPhone.top
+    });
+  }
+
+  function clearPhoneAnimation() {
+    if (phoneAnimTimeout) {
+      clearTimeout(phoneAnimTimeout);
+      phoneAnimTimeout = null;
+    }
+    if (phoneAnimInterval) {
+      clearInterval(phoneAnimInterval);
+      phoneAnimInterval = null;
+    }
+    phoneAutoActive = false;
+  }
+
+  function startPhoneAnimation() {
+    clearPhoneAnimation();
+    if (!PHONE_ANIM_SEQUENCE.length) return;
+    let index = 0;
+    applyPhoneFrame(PHONE_ANIM_SEQUENCE[index]);
+    phoneAnimInterval = setInterval(() => {
+      index = (index + 1) % PHONE_ANIM_SEQUENCE.length;
+      applyPhoneFrame(PHONE_ANIM_SEQUENCE[index]);
+    }, 300);
+    phoneAutoActive = true;
+  }
+
   function applyHandPngConfig(cfg) {
     if (!handPngEl || !cfg) return;
     handPngEl.src = cfg.src;
@@ -1139,18 +1194,10 @@ transform: translateX(-50%);
     handPngEl.style.display = 'block';
   }
 
-  function triggerPhoneAuto(now) {
-    applyHandPngConfig(handPngMap.simPhone);
-    phoneAutoActive = true;
-    phoneHoldStart = 0;
-    detectPauseUntil = now + 1000;
-    setTimeout(() => { phoneAutoActive = false; }, 1000);
-  }
-
   function triggerEggAuto(now) {
-    // EGGは認識時に egg1 を表示する
+    // EGGは認識時に egg0 を表示する
     applyHandPngConfig({
-      src: 'egg1.png',
+      src: 'egg0.png',
       width: '90%',
       left: '40%',
       top: '25%'
@@ -1179,11 +1226,14 @@ transform: translateX(-50%);
   }
 
   // ======== Helper: hand display ========
-  function activateHand(group, { updateText = true } = {}) {
+  function activateHand(group, { updateText = true, keepImage = false } = {}) {
     currentGroup = group;
     if (updateText) setTextBlocking(group !== 'none');
-    const cfg = HAND_PNG_BY_GROUP[group] || handPngMap.simRelaxed;
-    applyHandPngConfig(cfg);
+    if (!keepImage) {
+      const cfg = HAND_PNG_BY_GROUP[group] || handPngMap.simRelaxed;
+      applyHandPngConfig(cfg);
+    }
+    handleStaticOverlay(group);
   }
 
   function clearLockedVisual() {
@@ -1600,6 +1650,11 @@ transform: translateX(-50%);
 
       const now = performance.now();
 
+      if (staticDisplayPaused && currentGroup !== 'none') {
+        setTimeout(loop, 333);
+        return;
+      }
+
       // Blocking window (due to non-Relax) pauses detection completely
       // DIY mode pauses fcAI state changes, but keeps camera alive
       if (diyActive) {
@@ -1635,22 +1690,27 @@ transform: translateX(-50%);
 
       if (lockActive) {
         latestHudLine = 'Locked: detection paused.';
-      setTimeout(loop, 200);
-      return;
-    }
+        setTimeout(loop, 200);
+        return;
+      }
 
       if (now < freezeUntil) {
         latestObjects = freezeBoxes;
         latestHudLine = 'DO_MASTER_Grip_This? (auto freeze)';
-      setTimeout(loop, 200);
-      return;
-    }
+        setTimeout(loop, 200);
+        return;
+      }
+
+      if (phoneAutoActive) {
+        setTimeout(loop, 333);
+        return;
+      }
 
       if (currentGroup !== 'none') {
         // stop running detect() until Full Relax resets the state
-      setTimeout(loop, 200);
-      return;
-    }
+        setTimeout(loop, 200);
+        return;
+      }
 
       if (!model || !video.videoWidth || video.readyState < 2) {
       setTimeout(loop, 200);
@@ -1749,15 +1809,18 @@ transform: translateX(-50%);
 
         if (dominant === 'phone') {
           if (!phoneHoldStart) phoneHoldStart = now;
-        if (!phoneAutoActive && (now - phoneHoldStart) >= 200) {
-            activateHand('phone');
+          if (!phoneAutoActive && (now - phoneHoldStart) >= 200) {
+            activateHand('phone', { updateText: false, keepImage: true });
+            startPhoneAnimation();
+            detectPauseUntil = now + 1000;
             setResultText('State: PHONE group detected');
-            triggerPhoneAuto(now);
             setStatusText('PHONE detected: overlay ON (paused 1s).');
             latestHudLine = 'Phone detected: overlay ON (paused 1s)';
-      setTimeout(loop, 200);
-      return;
-    }
+            phoneHoldStart = 0;
+            currentGroup = 'none';
+            setTimeout(loop, 200);
+            return;
+          }
         } else {
           phoneHoldStart = 0;
         }
@@ -1839,7 +1902,7 @@ transform: translateX(-50%);
         lastGroups.push(dominant);
         if (lastGroups.length > 5) lastGroups.shift();
 
-        activateHand(dominant, { updateText: false });
+        activateHand(dominant, { updateText: false, keepImage: dominant === 'phone' });
         setResultText(
           dominant === 'none'
             ? 'State: RELAXED'
@@ -2203,6 +2266,9 @@ ${detSummary}
       debugHudSelect.value = 'off';
       return;
     }
+    if (staticDisplayPaused) {
+      return;
+    }
     if (debugHud.style.display === 'none') return;
     const text = buildHudText();
     lastHudFullText = text;
@@ -2313,8 +2379,8 @@ ${detSummary}
     updateHud();
   });
   simPhoneBtn.addEventListener('click', () => {
-    activateHand('phone');
-    applyHandPngConfig(handPngMap.simPhone);
+    activateHand('phone', { keepImage: true });
+    startPhoneAnimation();
     setResultText('State: PHONE (simulation)');
     setStatusText('Simulation: Phone support');
     demoFreeze(2000);
@@ -2504,6 +2570,7 @@ ${detSummary}
     }
 
     finishHeldText();
+    clearPhoneAnimation();
     activateHand('none');
     lockBtn.textContent = 'Lock';
     setResultText('State: RELAXED');
